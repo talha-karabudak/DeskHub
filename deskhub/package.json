@@ -1,0 +1,15 @@
+{
+  "name": "deskhub-milestone-2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "milestone2": "node --experimental-strip-types src/milestone2.ts",
+    "milestone3": "node --experimental-strip-types src/milestone3.ts",
+    "milestone4": "node --experimental-strip-types src/milestone4.ts",
+    "milestone5": "node --experimental-strip-types src/milestone5.ts",
+    "faceit": "node --experimental-strip-types src/faceit-app.ts",
+    "faceit:replay": "node --experimental-strip-types src/faceit-replay-latest.ts",
+    "faceit:demo": "node --experimental-strip-types src/faceit-display-demo.ts",
+    "test": "node --experimental-strip-types --test tests/*.test.ts"
+  }
+}

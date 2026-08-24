@@ -1,0 +1,5 @@
+{
+  "device_address": "XX:XX:XX:XX:XX:XX",
+  "serial_port": "auto",
+  "baudrate": 115200
+}
