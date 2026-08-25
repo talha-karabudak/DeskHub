@@ -10,6 +10,12 @@
     "faceit": "node --experimental-strip-types src/faceit-app.ts",
     "faceit:replay": "node --experimental-strip-types src/faceit-replay-latest.ts",
     "faceit:demo": "node --experimental-strip-types src/faceit-display-demo.ts",
+    "iracing:fake": "node --experimental-strip-types src/iracing-fake-demo.ts",
+    "iracing": "node --experimental-strip-types src/iracing-app.ts",
+    "iracing:check": "node --experimental-strip-types src/iracing-check.ts",
     "test": "node --experimental-strip-types --test tests/*.test.ts"
+  },
+  "dependencies": {
+    "irsdk-node": "^4.4.0"
   }
 }

@@ -141,3 +141,48 @@ node --experimental-strip-types .\deskhub\src\milestone2.ts
 HTTP uçları: `GET /health`, `POST /brightness`, `POST /display/frame`,
 `POST /display/text`, `POST /display/image`. Business logic ve event priority
 Python bridge'e ait değildir; bunlar DeskHub TypeScript katmanında kalır.
+
+## DeskHub iRacing integration
+
+iRacing entegrasyonu Windows'taki yerel SDK shared-memory arayüzünü
+`irsdk-node` üzerinden salt okunur. Acquisition ile business logic ayrıdır:
+
+```text
+iRacing shared memory (~60 Hz)
+  -> SDKIRacingTelemetrySource (10 Hz snapshot)
+  -> IRacingEventDetector (yalnızca state transition)
+  -> IRacingEventAdapter
+  -> mevcut priority queue
+  -> localhost Pixoo bridge
+```
+
+Pixoo continuous telemetry dashboard değildir. RPM, speed ve gear her tick'te
+ekrana gönderilmez. İlk sürüm idle konumu (`P7`) ile personal best, position
+gained/lost, incident delta, yellow/blue flag ve finish eventlerini destekler.
+Session'ın ilk snapshot'i baseline'dir; startup'ta eski PB replay edilmez.
+
+Fake pipeline:
+
+```powershell
+cd .\deskhub
+npm run iracing:fake
+```
+
+Bu demo `P7 -> PB -> P7` akışını mevcut queue ve Pixoo bridge ile oynatır.
+Native SDK kontrolü ve gerçek source:
+
+```powershell
+npm run iracing:check
+npm run iracing
+```
+
+Simulator kapalıyken source crash olmaz. Process'in açık olması tek başına
+IRACING mode sayılmaz; aktif session için SDK connection ile
+`IsOnTrack`/`IsOnTrackCar` telemetry sinyali gerekir.
+
+Known limitations:
+
+- Gerçek test için iRacing aynı Windows bilgisayarda aktif track session'ında olmalıdır.
+- Low fuel, güvenilir fuel-laps-remaining modeli kurulana kadar ertelendi.
+- Pit-cycle/session reset kaynaklı büyük position sıçramaları bastırılır.
+- Queue preemption bu milestone'un parçası değildir.
