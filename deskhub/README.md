@@ -55,3 +55,17 @@ more than one match was missed while DeskHub was offline, it safely re-baselines
 instead of inventing per-match ELO changes. Known results render as a short
 `WIN`/`LOSS` screen followed by the real delta; unknown deltas render only the
 result.
+
+Polling is adaptive: when FACEIT/CS2 process activity is present it defaults to
+60 seconds; otherwise a five-minute reconciliation poll remains active. Process
+state is only a scheduling hint and the FACEIT API remains the source of truth.
+Unchanged match history does not trigger another player/ELO request.
+
+The public player response does not document a reliable standard-CS2 placement
+flag or progress count. DeskHub therefore never infers placement from a null,
+zero, hidden, or changed ELO. When placement is independently known, set
+`FACEIT_PHASE=placement` and `FACEIT_PLACEMENT_PLAYED`; placement results show
+progress without a fabricated delta. Return `FACEIT_PHASE` to `ranked` after
+placements to establish the new ELO baseline without displaying the season
+reset as a match delta. `auto` preserves the persisted phase and makes no
+unsupported placement claim.

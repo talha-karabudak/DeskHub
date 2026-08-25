@@ -4,10 +4,11 @@ import { faceitIdleView, levelColor } from "../src/integrations/faceit/idle-view
 
 test("FACEIT idle view shows the last known level", () => {
   const view = faceitIdleView(8);
-  assert.equal(view.kind, "frame");
+  assert.equal(view.kind, "animation");
   assert.equal(view.label, "LEVEL 8");
-  assert.equal(view.pixels.length, 768);
-  assert.ok(view.pixels.some((channel) => channel > 0));
+  assert.equal(view.frameDurationMs, 0);
+  assert.equal(view.frames.length, 13);
+  assert.ok(view.frames.every((frame) => frame.length === 768));
 });
 
 test("level color becomes redder toward level 10", () => {

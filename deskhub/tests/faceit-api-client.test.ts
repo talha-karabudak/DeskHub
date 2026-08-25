@@ -39,3 +39,9 @@ test("configuration fails clearly when credentials are absent", () => {
   assert.throws(() => loadFaceitConfig({}), /FACEIT_API_KEY is missing/);
   assert.throws(() => loadFaceitConfig({ FACEIT_API_KEY: "x" }), /FACEIT_NICKNAME is missing/);
 });
+
+test("configuration provides adaptive polling and safe placement defaults", () => {
+  const config = loadFaceitConfig({ FACEIT_API_KEY: "x", FACEIT_NICKNAME: "tester" });
+  assert.equal(config.activePollIntervalMs, 60_000); assert.equal(config.idlePollIntervalMs, 300_000);
+  assert.equal(config.phaseMode, "auto"); assert.equal(config.placementTotal, 10);
+});

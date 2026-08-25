@@ -80,6 +80,22 @@ class SerialTransport:
             # a one-shot CLI command closes the virtual COM port.
             time.sleep(0.25)
         except Exception as exc:
+            # pyserial/Windows may leave is_open=True after RFCOMM has died.
+            # Invalidate the handle before reporting the error so health checks
+            # cannot claim that a failed connection is still usable.
+            self._invalidate_connection()
             raise TransportError(f"write to {self.port} failed: {exc}") from exc
         if written != len(data):
+            self._invalidate_connection()
             raise TransportError(f"short write on {self.port}: {written}/{len(data)} bytes")
+
+    def _invalidate_connection(self) -> None:
+        serial_port, self._serial = self._serial, None
+        if serial_port is None:
+            return
+        try:
+            if serial_port.is_open:
+                serial_port.close()
+        except Exception:
+            logger.debug("Failed to close invalid serial handle", exc_info=True)
+        logger.warning("Connection invalidated on %s", self.port)

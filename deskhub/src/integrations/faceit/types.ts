@@ -5,7 +5,13 @@ export interface FaceitMatchResult {
   eloAfter: number | null;
   eloDelta: number | null;
   finishedAt: string;
+  phase?: FaceitPhase;
+  placement?: FaceitPlacementState | null;
+  placementCompleted?: boolean;
 }
+
+export type FaceitPhase = "unknown" | "placement" | "ranked";
+export interface FaceitPlacementState { played: number; wins: number; losses: number; total: number; }
 
 export interface FaceitMatchSource {
   latestResult(): Promise<FaceitMatchResult | null>;
@@ -52,6 +58,9 @@ export interface FaceitPersistentState {
   lastKnownElo: number | null;
   processedMatchIds: string[];
   updatedAt: string;
+  phase?: FaceitPhase;
+  placement?: FaceitPlacementState | null;
+  stateVersion?: number;
 }
 
 export interface FaceitStateStore {

@@ -21,7 +21,14 @@ export interface PixooFrameView {
   label: string;
 }
 
-export type PixooView = PixooTextView | PixooFrameView;
+export interface PixooAnimationView {
+  kind: "animation";
+  frames: number[][];
+  frameDurationMs: number;
+  label: string;
+}
+
+export type PixooView = PixooTextView | PixooFrameView | PixooAnimationView;
 
 export interface DeskHubEvent {
   id: string;
@@ -29,5 +36,5 @@ export interface DeskHubEvent {
   mode: DeskHubMode;
   priority: number;
   durationMs: number;
-  view: PixooTextView;
+  view: PixooView;
 }

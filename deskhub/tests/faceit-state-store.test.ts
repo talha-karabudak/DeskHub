@@ -21,3 +21,12 @@ test("corrupted state safely returns null", async () => {
   try { await writeFile(path, "{broken", "utf8"); assert.equal(await new JsonFaceitStateStore(path, () => {}).load(), null); }
   finally { await rm(directory, { recursive: true, force: true }); }
 });
+
+test("legacy state without phase fields remains loadable", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "deskhub-faceit-")); const path = join(directory, "faceit-state.json");
+  const legacy = { playerId: "p1", nickname: "tester", lastSeenMatchId: "A", lastKnownElo: 887,
+    processedMatchIds: ["A"], updatedAt: "2026-08-23T00:00:00Z" };
+  try { await writeFile(path, JSON.stringify(legacy), "utf8"); const loaded = await new JsonFaceitStateStore(path, () => {}).load();
+    assert.equal(loaded?.lastKnownElo, 887); assert.equal(loaded?.phase, undefined); }
+  finally { await rm(directory, { recursive: true, force: true }); }
+});

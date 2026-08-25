@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { RealFaceitSource } from "../src/integrations/faceit/source.ts";
 import type { FaceitDataClient, FaceitHistoryItem, FaceitHistoryResponse, FaceitPersistentState, FaceitPlayer, FaceitStateStore } from "../src/integrations/faceit/types.ts";
+import type { FaceitPhaseObservation, FaceitPhaseProvider } from "../src/integrations/faceit/phase.ts";
 
 function player(elo: number): FaceitPlayer { return { player_id: "p1", nickname: "tester", games: { cs2: { skill_level: 8, faceit_elo: elo } } }; }
 function match(id: string, won: boolean): FaceitHistoryItem {
@@ -11,12 +12,19 @@ function match(id: string, won: boolean): FaceitHistoryItem {
 class FakeClient implements FaceitDataClient {
   players: FaceitPlayer[];
   histories: FaceitHistoryResponse[];
+  playerCalls = 0;
+  historyCalls = 0;
   constructor(elos: number[], matches: FaceitHistoryItem[]) { this.players = elos.map(player); this.histories = matches.map((item) => ({ items: [item] })); }
-  async getPlayerByNickname(): Promise<FaceitPlayer> { return this.nextPlayer(); }
-  async getPlayerById(): Promise<FaceitPlayer> { return this.nextPlayer(); }
-  async getMatchHistory(): Promise<FaceitHistoryResponse> { return this.histories.shift() ?? { items: [] }; }
+  async getPlayerByNickname(): Promise<FaceitPlayer> { this.playerCalls++; return this.nextPlayer(); }
+  async getPlayerById(): Promise<FaceitPlayer> { this.playerCalls++; return this.nextPlayer(); }
+  async getMatchHistory(): Promise<FaceitHistoryResponse> { this.historyCalls++; return this.histories.shift() ?? { items: [] }; }
   async getMatch(): Promise<FaceitHistoryItem> { throw new Error("unused"); }
   private nextPlayer(): FaceitPlayer { const value = this.players.shift(); if (!value) throw new Error("fake player sequence exhausted"); return value; }
+}
+class StaticPhase implements FaceitPhaseProvider {
+  constructor(privateValue: FaceitPhaseObservation) { this.value = privateValue; }
+  private readonly value: FaceitPhaseObservation;
+  current(): FaceitPhaseObservation { return this.value; }
 }
 function source(client: FaceitDataClient): RealFaceitSource { return new RealFaceitSource({ client, nickname: "tester", sleep: async () => {}, log: () => {} }); }
 
@@ -90,4 +98,42 @@ test("multiple unseen matches re-baseline without invented delta", async () => {
   client.histories = [{ items: [match("C", false), match("B", true), match("A", true)] }];
   const result = await new RealFaceitSource({ client, nickname: "tester", stateStore: store, log: () => {} }).latestResult();
   assert.equal(result, null); assert.equal(store.state?.lastSeenMatchId, "C"); assert.equal(store.state?.lastKnownElo, 890);
+});
+
+test("unchanged latest match polls history without another player/ELO request", async () => {
+  const client = new FakeClient([887], [match("A", true), match("A", true)]); const value = source(client);
+  await value.latestResult(); await value.latestResult();
+  assert.equal(client.historyCalls, 2); assert.equal(client.playerCalls, 1);
+});
+
+test("new match fetches player/ELO after history changes", async () => {
+  const client = new FakeClient([887, 912], [match("A", true), match("B", true)]); const value = source(client);
+  await value.latestResult(); await value.latestResult(); assert.equal(client.playerCalls, 2);
+});
+
+test("placement start invalidates old ranked ELO and emits progress without delta", async () => {
+  const store = new MemoryStore({ ...stored(1842, "A"), phase: "ranked", placement: null });
+  const client = new FakeClient([1700], []); client.histories = [{ items: [match("B", true), match("A", false)] }];
+  const result = await new RealFaceitSource({ client, nickname: "tester", stateStore: store,
+    phaseProvider: new StaticPhase({ phase: "placement", placement: { played: 0, wins: 0, losses: 0, total: 10 } }), log: () => {} }).latestResult();
+  assert.equal(result?.phase, "placement"); assert.equal(result?.eloDelta, null); assert.equal(result?.placement?.played, 1);
+  assert.equal(store.state?.lastKnownElo, null); assert.equal(store.state?.phase, "placement");
+});
+
+test("placement loss persists progress and restart keeps placement phase", async () => {
+  const store = new MemoryStore({ ...stored(null, "B"), phase: "placement",
+    placement: { played: 1, wins: 1, losses: 0, total: 10 } });
+  const client = new FakeClient([1700], []); client.histories = [{ items: [match("C", false), match("B", true)] }];
+  const result = await new RealFaceitSource({ client, nickname: "tester", stateStore: store,
+    phaseProvider: new StaticPhase({ phase: "placement", placement: { played: 0, wins: 0, losses: 0, total: 10 } }), log: () => {} }).latestResult();
+  assert.equal(result?.won, false); assert.deepEqual(store.state?.placement, { played: 2, wins: 1, losses: 1, total: 10 });
+});
+
+test("placement completion establishes new ranked baseline without season-reset delta", async () => {
+  const store = new MemoryStore({ ...stored(null, "C"), phase: "placement",
+    placement: { played: 10, wins: 6, losses: 4, total: 10 } });
+  const result = await new RealFaceitSource({ client: new FakeClient([1734], [match("C", true)]), nickname: "tester", stateStore: store,
+    phaseProvider: new StaticPhase({ phase: "ranked" }), log: () => {} }).latestResult();
+  assert.equal(result?.placementCompleted, true); assert.equal(result?.eloDelta, null);
+  assert.equal(store.state?.phase, "ranked"); assert.equal(store.state?.lastKnownElo, 1734);
 });

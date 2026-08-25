@@ -11,6 +11,7 @@ const defaultNormalView = (): PixooTextView => ({
 export class DeskHubCore {
   private readonly queue = new PixooEventQueue();
   private pumpPromise: Promise<void> | undefined;
+  private normalRenderPromise: Promise<void> | undefined;
   private readonly sleep: Sleep;
   private readonly display: PixooDisplay;
   private readonly normalView: () => PixooView;
@@ -44,10 +45,12 @@ export class DeskHubCore {
 
   async showNormal(): Promise<void> {
     if (this.state.processing || this.queue.length > 0) return;
+    if (this.normalRenderPromise) { await this.normalRenderPromise; return; }
     const view = this.normalView();
     this.state.mode = "normal";
     this.state.pixoo = { screen: view.kind === "text" ? view.text : view.label, priority: 0 };
-    await this.render(view);
+    this.normalRenderPromise = this.render(view).finally(() => { this.normalRenderPromise = undefined; });
+    await this.normalRenderPromise;
   }
 
   private startPump(): void {
@@ -59,19 +62,21 @@ export class DeskHubCore {
   }
 
   private async pump(): Promise<void> {
+    if (this.normalRenderPromise) await this.normalRenderPromise;
     this.state.processing = true;
     try {
       let current: DeskHubEvent | undefined;
       while ((current = this.queue.dequeue())) {
         this.state.queueLength = this.queue.length;
         this.state.mode = current.mode;
-        this.state.pixoo = { screen: current.view.text, priority: current.priority };
-        await this.display.showText(current.view.text, {
-          color: current.view.color,
-          scroll: current.view.scroll,
-          duration: current.durationMs / 1000,
-        });
-        if (!current.view.scroll) await this.sleep(current.durationMs);
+        this.state.pixoo = { screen: this.viewLabel(current.view), priority: current.priority };
+        if (current.view.kind === "text") {
+          await this.display.showText(current.view.text, { color: current.view.color, scroll: current.view.scroll,
+            duration: current.durationMs / 1000 });
+          if (!current.view.scroll) await this.sleep(current.durationMs);
+        } else {
+          await this.render(current.view);
+        }
       }
       await this.showNormalAfterEvents();
       delete this.state.lastError;
@@ -93,6 +98,10 @@ export class DeskHubCore {
 
   private async render(view: PixooView): Promise<void> {
     if (view.kind === "frame") await this.display.showFrame(view.pixels);
-    else await this.display.showText(view.text, { color: view.color, scroll: view.scroll });
+    else if (view.kind === "animation") {
+      for (const frame of view.frames) { await this.display.showFrame(frame); await this.sleep(view.frameDurationMs); }
+    } else await this.display.showText(view.text, { color: view.color, scroll: view.scroll });
   }
+
+  private viewLabel(view: PixooView): string { return view.kind === "text" ? view.text : view.label; }
 }

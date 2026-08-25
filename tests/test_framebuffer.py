@@ -55,6 +55,11 @@ class FramebufferTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unsupported"):
             frame.draw_text(0, 0, "!", 255, 255, 255)
 
+    def test_placement_progress_characters_render(self) -> None:
+        frame = Framebuffer()
+        frame.draw_text(0, 0, "4/10", 255, 140, 0)
+        self.assertNotEqual(frame.to_rgb_bytes(), bytes(16 * 16 * 3))
+
     def test_text_width(self) -> None:
         self.assertEqual(Framebuffer.text_width(""), 0)
         self.assertEqual(Framebuffer.text_width("HI"), 7)

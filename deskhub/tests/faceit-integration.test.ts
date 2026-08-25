@@ -10,8 +10,10 @@ test("FACEIT win becomes a green priority event", () => {
   });
   assert.equal(event?.type, "FaceitMatchWon");
   assert.equal(event?.priority, 70);
-  assert.equal(event?.view.text, "VICTORY");
-  assert.deepEqual(event?.view.color, [0, 255, 0]);
+  assert.equal(event?.view.kind, "animation");
+  assert.equal(event?.view.kind === "animation" ? event.view.label : undefined, "VICTORY");
+  assert.ok(event?.view.kind === "animation" && event.view.frames.some((frame) =>
+    frame.some((value, index) => index % 3 === 1 && value === 255)));
 });
 
 test("duplicate FACEIT match is ignored", () => {
@@ -27,12 +29,19 @@ test("duplicate FACEIT match is ignored", () => {
 test("known delta becomes a short result and delta sequence", () => {
   const sequence = new FaceitEventAdapter().toEvents({ matchId: "match-2", won: true,
     eloBefore: 887, eloAfter: 912, eloDelta: 25, finishedAt: "2026-08-23T10:00:00Z" });
-  assert.deepEqual(sequence?.map((item) => item.view.text), ["VICTORY", "+25"]);
-  assert.deepEqual(sequence?.map((item) => item.durationMs), [12000, 3000]);
+  assert.deepEqual(sequence?.map((item) => item.view.kind === "text" ? item.view.text : item.view.label), ["VICTORY", "ELO DELTA"]);
+  assert.ok(sequence?.every((item) => item.view.kind === "animation"));
 });
 
 test("unknown delta never renders zero or current total ELO", () => {
   const sequence = new FaceitEventAdapter().toEvents({ matchId: "match-3", won: false,
     eloBefore: 887, eloAfter: null, eloDelta: null, finishedAt: "2026-08-23T10:00:00Z" });
-  assert.deepEqual(sequence?.map((item) => item.view.text), ["LOSS"]);
+  assert.deepEqual(sequence?.map((item) => item.view.kind === "text" ? item.view.text : item.view.label), ["LOSS"]);
+});
+
+test("placement result renders progress instead of fake ELO", () => {
+  const sequence = new FaceitEventAdapter().toEvents({ matchId: "placement-1", won: true,
+    eloBefore: 0, eloAfter: null, eloDelta: null, finishedAt: "2026-08-23T10:00:00Z",
+    phase: "placement", placement: { played: 4, wins: 3, losses: 1, total: 10 } });
+  assert.deepEqual(sequence?.map((item) => item.view.kind === "text" ? item.view.text : item.view.label), ["VICTORY", "PLACEMENT"]);
 });

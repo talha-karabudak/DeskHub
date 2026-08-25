@@ -1,11 +1,38 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from pixoo.errors import TransportError
 from pixoo.transport import SerialTransport
 
 
 class ReconnectTests(unittest.TestCase):
+    def test_write_failure_invalidates_open_connection(self) -> None:
+        transport = SerialTransport("COM_TEST")
+        serial_port = Mock()
+        serial_port.is_open = True
+        serial_port.write.side_effect = OSError("rfcomm dropped")
+        transport._serial = serial_port
+
+        with self.assertRaisesRegex(TransportError, "rfcomm dropped"):
+            transport.send(b"frame")
+
+        self.assertFalse(transport.is_connected)
+        serial_port.close.assert_called_once_with()
+
+    def test_short_write_invalidates_open_connection(self) -> None:
+        transport = SerialTransport("COM_TEST")
+        serial_port = Mock()
+        serial_port.is_open = True
+        serial_port.write.return_value = 2
+        transport._serial = serial_port
+
+        with patch("pixoo.transport.time.sleep"):
+            with self.assertRaisesRegex(TransportError, "short write"):
+                transport.send(b"frame")
+
+        self.assertFalse(transport.is_connected)
+        serial_port.close.assert_called_once_with()
+
     def test_reconnect_retries_until_success(self) -> None:
         transport = SerialTransport("COM_TEST")
         failures = [TransportError("first"), TransportError("second"), None]

@@ -16,9 +16,13 @@ export class FaceitEventAdapter {
     }
     if (this.processedMatches.has(result.matchId)) return undefined;
     this.processedMatches.add(result.matchId);
+    if (result.placementCompleted) return [events.faceitPlaced(), events.faceitPlacedElo(result.eloAfter ?? result.eloBefore)];
     const resultEvent = result.won
       ? events.faceitMatchWon(result.eloDelta)
       : events.faceitMatchLost(result.eloDelta);
+    if (result.phase === "placement" && result.placement) {
+      return [resultEvent, events.faceitPlacementProgress(result.placement.played, result.placement.total)];
+    }
     return result.eloDelta === null ? [resultEvent] : [resultEvent, events.faceitEloDelta(result.eloDelta)];
   }
 }
