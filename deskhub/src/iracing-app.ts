@@ -11,7 +11,9 @@ process.once("SIGTERM", () => controller.abort());
 const display = new HttpPixooDisplay();
 console.log("[DeskHub] Pixoo:", await display.getStatus());
 let pipeline: IRacingPipeline;
-const core = new DeskHubCore(display, undefined, () => iracingIdleView(pipeline?.getCurrentPosition()));
+const core = new DeskHubCore(display, undefined,
+  () => iracingIdleView(pipeline?.getCurrentPosition(), undefined,
+    pipeline?.getYellowFlag(), pipeline?.getBlueFlag()));
 const source = new SDKIRacingTelemetrySource({ signal: controller.signal });
 pipeline = new IRacingPipeline(source, core);
 await pipeline.run();

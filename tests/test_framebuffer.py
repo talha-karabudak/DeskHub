@@ -60,6 +60,11 @@ class FramebufferTests(unittest.TestCase):
         frame.draw_text(0, 0, "4/10", 255, 140, 0)
         self.assertNotEqual(frame.to_rgb_bytes(), bytes(16 * 16 * 3))
 
+    def test_lap_time_punctuation_renders(self) -> None:
+        frame = Framebuffer()
+        frame.draw_text(0, 0, "1:23.45", 255, 255, 255)
+        self.assertNotEqual(frame.to_rgb_bytes(), bytes(16 * 16 * 3))
+
     def test_text_width(self) -> None:
         self.assertEqual(Framebuffer.text_width(""), 0)
         self.assertEqual(Framebuffer.text_width("HI"), 7)

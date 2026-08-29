@@ -13,6 +13,7 @@
     "iracing:fake": "node --experimental-strip-types src/iracing-fake-demo.ts",
     "iracing": "node --experimental-strip-types src/iracing-app.ts",
     "iracing:check": "node --experimental-strip-types src/iracing-check.ts",
+    "iracing:inspect": "node --experimental-strip-types src/iracing-inspect.ts",
     "test": "node --experimental-strip-types --test tests/*.test.ts"
   },
   "dependencies": {

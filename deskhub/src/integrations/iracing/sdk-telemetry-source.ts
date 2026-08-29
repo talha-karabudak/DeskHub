@@ -45,8 +45,12 @@ export class SDKIRacingTelemetrySource implements IRacingTelemetrySource {
         this.log("Telemetry source connected");
       }
       if (!sdk.waitForData(16)) {
-        sdk.stopSDK(); sdk = undefined;
-        yield { connected: false };
+        if (!sdk.sessionStatusOK) {
+          sdk.stopSDK(); sdk = undefined;
+          yield { connected: false };
+        } else {
+          await sleep(this.sampleIntervalMs, this.signal);
+        }
         continue;
       }
       const telemetry = sdk.getTelemetry();
@@ -59,6 +63,7 @@ export class SDKIRacingTelemetrySource implements IRacingTelemetrySource {
         sessionId: `${sdk.getSessionConnectionID()}:${sessionNum ?? "unknown"}`,
         position: positiveInteger(numberValue(telemetry.PlayerCarPosition)),
         lap: nonNegativeInteger(numberValue(telemetry.Lap)),
+        lapCompleted: nonNegativeInteger(numberValue(telemetry.LapCompleted)),
         lapCurrentLapTime: positiveNumber(numberValue(telemetry.LapCurrentLapTime)),
         lapLastLapTime: positiveNumber(numberValue(telemetry.LapLastLapTime)),
         lapBestLapTime: positiveNumber(numberValue(telemetry.LapBestLapTime)),
@@ -66,11 +71,17 @@ export class SDKIRacingTelemetrySource implements IRacingTelemetrySource {
         rpm: finiteNumber(numberValue(telemetry.RPM)),
         gear: integer(numberValue(telemetry.Gear)),
         fuelLevel: nonNegativeNumber(numberValue(telemetry.FuelLevel)),
+        fuelLevelPct: nonNegativeNumber(numberValue(telemetry.FuelLevelPct)),
         incidentCount: nonNegativeInteger(numberValue(telemetry.PlayerCarMyIncidentCount)),
         onPitRoad: booleanValue(telemetry.OnPitRoad),
+        carLeftRight: integer(numberValue(telemetry.CarLeftRight)),
         yellowFlag: hasFlag(flags, GlobalFlags.Yellow) || hasFlag(flags, GlobalFlags.YellowWaving)
           || hasFlag(flags, GlobalFlags.Caution) || hasFlag(flags, GlobalFlags.CautionWaving),
         blueFlag: hasFlag(flags, GlobalFlags.Blue),
+        whiteFlag: hasFlag(flags, GlobalFlags.White),
+        startReady: hasFlag(flags, GlobalFlags.StartReady),
+        startSet: hasFlag(flags, GlobalFlags.StartSet),
+        startGo: hasFlag(flags, GlobalFlags.StartGo),
         checkeredFlag: hasFlag(flags, GlobalFlags.Checkered),
       };
       await sleep(this.sampleIntervalMs, this.signal);

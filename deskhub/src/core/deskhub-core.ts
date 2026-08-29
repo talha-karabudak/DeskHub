@@ -12,6 +12,7 @@ export class DeskHubCore {
   private readonly queue = new PixooEventQueue();
   private pumpPromise: Promise<void> | undefined;
   private normalRenderPromise: Promise<void> | undefined;
+  private urgentOverlay: PixooView | undefined;
   private readonly sleep: Sleep;
   private readonly display: PixooDisplay;
   private readonly normalView: () => PixooView;
@@ -41,7 +42,20 @@ export class DeskHubCore {
     this.startPump();
   }
 
-  async whenIdle(): Promise<void> { await this.pumpPromise; }
+  async whenIdle(): Promise<void> {
+    while (this.pumpPromise || this.normalRenderPromise) {
+      await Promise.all([this.pumpPromise, this.normalRenderPromise]);
+    }
+  }
+
+  async setUrgentOverlay(view: PixooView | undefined): Promise<void> {
+    this.urgentOverlay = view;
+    if (view) {
+      await this.renderDirect(view);
+    } else {
+      await this.renderDirect(this.normalView());
+    }
+  }
 
   async showNormal(): Promise<void> {
     if (this.state.processing || this.queue.length > 0) return;
@@ -51,6 +65,12 @@ export class DeskHubCore {
     this.state.pixoo = { screen: view.kind === "text" ? view.text : view.label, priority: 0 };
     this.normalRenderPromise = this.render(view).finally(() => { this.normalRenderPromise = undefined; });
     await this.normalRenderPromise;
+  }
+
+  requestNormal(): void {
+    void this.showNormal().catch((error) => {
+      this.state.lastError = error instanceof Error ? error.message : String(error);
+    });
   }
 
   private startPump(): void {
@@ -97,10 +117,21 @@ export class DeskHubCore {
   }
 
   private async render(view: PixooView): Promise<void> {
-    if (view.kind === "frame") await this.display.showFrame(view.pixels);
+    if (view.kind === "frame") {
+      if (!this.urgentOverlay) await this.display.showFrame(view.pixels);
+    }
     else if (view.kind === "animation") {
-      for (const frame of view.frames) { await this.display.showFrame(frame); await this.sleep(view.frameDurationMs); }
-    } else await this.display.showText(view.text, { color: view.color, scroll: view.scroll });
+      for (const frame of view.frames) {
+        if (!this.urgentOverlay) await this.display.showFrame(frame);
+        await this.sleep(view.frameDurationMs);
+      }
+    } else if (!this.urgentOverlay) await this.display.showText(view.text, { color: view.color, scroll: view.scroll });
+  }
+
+  private async renderDirect(view: PixooView): Promise<void> {
+    if (view.kind === "frame") await this.display.showFrame(view.pixels);
+    else if (view.kind === "animation") await this.display.showFrame(view.frames[0]);
+    else await this.display.showText(view.text, { color: view.color, scroll: view.scroll });
   }
 
   private viewLabel(view: PixooView): string { return view.kind === "text" ? view.text : view.label; }

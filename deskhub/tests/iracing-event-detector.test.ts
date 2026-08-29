@@ -45,6 +45,24 @@ test("incident increase emits delta once and reset emits nothing", () => {
   assert.deepEqual(detector.update(base({ incidentCount: 0 })), []);
 });
 
+test("completed lap emits time and delta when it is not a PB", () => {
+  const detector = new IRacingEventDetector();
+  detector.update(base({ lapCompleted: 2, lapLastLapTime: 109 }));
+  assert.deepEqual(detector.update(base({ lapCompleted: 3, lapLastLapTime: 109.25 })),
+    [{ type: "LAP_COMPLETED", lapTime: 109.25, delta: 0.75 }]);
+});
+
+test("pit, start and last-lap transitions emit once", () => {
+  const detector = new IRacingEventDetector();
+  detector.update(base({ onPitRoad: false }));
+  assert.deepEqual(detector.update(base({ onPitRoad: true, startReady: true })),
+    [{ type: "PIT_ENTRY" }, { type: "START_READY" }]);
+  assert.deepEqual(detector.update(base({ onPitRoad: true, startReady: true, startSet: true })),
+    [{ type: "START_SET" }]);
+  assert.deepEqual(detector.update(base({ startReady: true, startSet: true, startGo: true, whiteFlag: true })),
+    [{ type: "START_GO" }, { type: "LAST_LAP" }]);
+});
+
 test("flag transitions emit once while active", () => {
   const detector = new IRacingEventDetector();
   detector.update(base());
@@ -57,7 +75,7 @@ test("flag transitions emit once while active", () => {
 test("disconnect and session change reset the baseline", () => {
   const detector = new IRacingEventDetector();
   detector.update(base());
-  assert.deepEqual(detector.update({ connected: false }), []);
+  assert.deepEqual(detector.update({ connected: false }), [{ type: "DISCONNECTED" }]);
   assert.deepEqual(detector.update(base({ position: 2, lapBestLapTime: 90 })),
     [{ type: "SESSION_ACTIVE", position: 2 }]);
   assert.deepEqual(detector.update(base({ sessionId: "race-2", position: 9, lapBestLapTime: 120 })),

@@ -12,8 +12,9 @@ export class IRacingEventDetector {
 
   update(current: IRacingTelemetry): IRacingDomainEvent[] {
     if (!current.connected || !current.sessionActive) {
+      const disconnected = this.previous !== undefined && !current.connected;
       this.previous = undefined;
-      return [];
+      return disconnected ? [{ type: "DISCONNECTED" }] : [];
     }
     const previous = this.previous;
     this.previous = current;
@@ -26,6 +27,12 @@ export class IRacingEventDetector {
     const newBest = validLapTime(current.lapBestLapTime);
     if (oldBest !== undefined && newBest !== undefined && newBest < oldBest) {
       result.push({ type: "PERSONAL_BEST", previous: oldBest, current: newBest });
+    } else if (lapAdvanced(previous, current)) {
+      const lapTime = validLapTime(current.lapLastLapTime);
+      if (lapTime !== undefined) {
+        result.push({ type: "LAP_COMPLETED", lapTime,
+          delta: oldBest === undefined ? undefined : lapTime - oldBest });
+      }
     }
 
     const from = validPosition(previous.position);
@@ -39,11 +46,21 @@ export class IRacingEventDetector {
     if (oldIncidents !== undefined && newIncidents !== undefined && newIncidents > oldIncidents) {
       result.push({ type: "INCIDENT_RECEIVED", delta: newIncidents - oldIncidents, total: newIncidents });
     }
+    if (!previous.onPitRoad && current.onPitRoad) result.push({ type: "PIT_ENTRY" });
+    if (!previous.startReady && current.startReady) result.push({ type: "START_READY" });
+    if (!previous.startSet && current.startSet) result.push({ type: "START_SET" });
+    if (!previous.startGo && current.startGo) result.push({ type: "START_GO" });
+    if (!previous.whiteFlag && current.whiteFlag) result.push({ type: "LAST_LAP" });
     if (!previous.yellowFlag && current.yellowFlag) result.push({ type: "YELLOW_FLAG" });
     if (!previous.blueFlag && current.blueFlag) result.push({ type: "BLUE_FLAG" });
     if (!previous.checkeredFlag && current.checkeredFlag) result.push({ type: "FINISH", position: to });
     return result;
   }
+}
+
+function lapAdvanced(previous: IRacingTelemetry, current: IRacingTelemetry): boolean {
+  return Number.isInteger(previous.lapCompleted) && Number.isInteger(current.lapCompleted)
+    && current.lapCompleted! > previous.lapCompleted!;
 }
 
 function validLapTime(value: number | undefined): number | undefined {
