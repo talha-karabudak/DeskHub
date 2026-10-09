@@ -64,6 +64,7 @@ export class SDKIRacingTelemetrySource implements IRacingTelemetrySource {
         position: positiveInteger(numberValue(telemetry.PlayerCarPosition)),
         lap: nonNegativeInteger(numberValue(telemetry.Lap)),
         lapCompleted: nonNegativeInteger(numberValue(telemetry.LapCompleted)),
+        lapsRemaining: nonNegativeNumber(numberValue(telemetry.SessionLapsRemainEx)),
         lapCurrentLapTime: positiveNumber(numberValue(telemetry.LapCurrentLapTime)),
         lapLastLapTime: positiveNumber(numberValue(telemetry.LapLastLapTime)),
         lapBestLapTime: positiveNumber(numberValue(telemetry.LapBestLapTime)),

@@ -4,6 +4,7 @@ import { DeskHubCore } from "../src/core/deskhub-core.ts";
 import { FakeIRacingTelemetrySource } from "../src/integrations/iracing/fake-telemetry-source.ts";
 import { iracingIdleView } from "../src/integrations/iracing/idle-view.ts";
 import { IRacingPipeline } from "../src/integrations/iracing/pipeline.ts";
+import { RaceStateProjector } from "../src/integrations/iracing/race-state-projector.ts";
 import type { DisplayStatus, PixooDisplay, ShowTextOptions } from "../src/pixoo-display.ts";
 
 class MockDisplay implements PixooDisplay {
@@ -59,4 +60,22 @@ test("telemetry unavailable exits to normal without crashing", async () => {
   await pipeline.run();
   assert.deepEqual(display.calls, ["P7", "DISC", "RDY"]);
   assert.equal(core.state.mode, "normal");
+});
+
+test("one telemetry stream feeds existing events and race companion state", async () => {
+  const session = { connected: true, sessionActive: true, sessionId: "race" } as const;
+  const source = new FakeIRacingTelemetrySource([
+    { ...session, position: 7, lapCompleted: 0, lapBestLapTime: 108.5 },
+    { ...session, position: 7, lapCompleted: 1, lapLastLapTime: 107.9, lapBestLapTime: 107.9 },
+  ]);
+  const display = new MockDisplay();
+  const projector = new RaceStateProjector();
+  let pipeline: IRacingPipeline;
+  const core = new DeskHubCore(display, async () => {}, () => iracingIdleView(pipeline?.getCurrentPosition()));
+  pipeline = new IRacingPipeline(source, core, undefined, undefined, [projector]);
+  await pipeline.run();
+  assert.deepEqual(display.calls, ["P7", "PB", "LAP", "P7"]);
+  assert.deepEqual(projector.getState().laps.recent[0], {
+    lapNumber: 1, lapTime: 107.9, deltaToBest: 0, incidentDelta: 0,
+  });
 });

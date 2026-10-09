@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#090b0d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Race Companion">
+  <title>Race Companion</title>
+  <link rel="manifest" href="/race/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/race/icon.svg">
+  <link rel="stylesheet" href="/race/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">RC</span><span>Race Companion</span></div>
+    <div class="session-status" id="session-status" data-state="loading" aria-live="polite">
+      <span class="status-dot"></span><span id="session-label">Connecting</span>
+    </div>
+  </header>
+
+  <main class="dashboard">
+    <section class="panel position-panel" aria-labelledby="position-title">
+      <p class="eyebrow" id="position-title">Position</p>
+      <div class="hero-value position-value"><span class="prefix">P</span><span id="position-current">—</span></div>
+      <div class="support-row">
+        <div><span class="label">Start</span><strong id="position-start">—</strong></div>
+        <div><span class="label">Gain / Loss</span><strong id="position-change">—</strong></div>
+      </div>
+    </section>
+
+    <section class="panel progress-panel" aria-labelledby="progress-title">
+      <p class="eyebrow" id="progress-title">Race Progress</p>
+      <div class="progress-values">
+        <div><span class="label">Lap</span><strong id="lap-current">—</strong></div>
+        <span class="progress-divider">/</span>
+        <div><span class="label">Remaining</span><strong id="lap-remaining">—</strong></div>
+      </div>
+      <p class="context-note" id="lap-context">Waiting for session data</p>
+    </section>
+
+    <section class="panel timing-panel" aria-labelledby="timing-title">
+      <p class="eyebrow" id="timing-title">Last Lap</p>
+      <div class="hero-value time-value" id="last-lap">—</div>
+      <div class="support-row">
+        <div><span class="label">Best</span><strong id="best-lap">—</strong></div>
+        <div><span class="label">Delta</span><strong id="last-delta">—</strong></div>
+      </div>
+    </section>
+
+    <section class="panel recent-panel" aria-labelledby="recent-title">
+      <div class="section-heading">
+        <p class="eyebrow" id="recent-title">Recent Laps</p>
+        <span class="legend"><i></i> Best</span>
+      </div>
+      <div class="laps-header" aria-hidden="true"><span>Lap</span><span>Time</span><span>Delta</span><span>Inc.</span></div>
+      <div class="laps-list" id="recent-laps"><p class="empty-state">No completed laps</p></div>
+    </section>
+
+    <section class="panel fuel-panel" aria-labelledby="fuel-title">
+      <p class="eyebrow" id="fuel-title">Fuel</p>
+      <div class="fuel-primary"><strong id="fuel-remaining">—</strong><span>L remaining</span></div>
+      <dl class="fuel-metrics">
+        <div><dt>Average / lap</dt><dd id="fuel-average">—</dd></div>
+        <div><dt>Estimated laps</dt><dd id="fuel-laps">—</dd></div>
+        <div class="finish-row"><dt>At finish</dt><dd id="fuel-finish">—</dd></div>
+      </dl>
+      <p class="context-note" id="fuel-context">Waiting for completed laps</p>
+    </section>
+  </main>
+
+  <footer><span id="updated-at">Not updated yet</span><span>Refreshes every second</span></footer>
+  <script src="/race/app.js" defer></script>
+</body>
+</html>

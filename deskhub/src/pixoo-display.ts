@@ -19,6 +19,24 @@ export interface PixooDisplay {
   showFrame(pixels: number[]): Promise<void>;
 }
 
+export type DisplayMode = "pixoo" | "none";
+
+export class NullDisplay implements PixooDisplay {
+  async getStatus(): Promise<DisplayStatus> {
+    return { status: "disconnected", connected: false, device_address: "", serial_port: "" };
+  }
+
+  async setBrightness(_value: number): Promise<void> {}
+  async showText(_text: string, _options?: ShowTextOptions): Promise<void> {}
+  async showFrame(_pixels: number[]): Promise<void> {}
+}
+
+export function createDisplay(mode = "pixoo"): PixooDisplay {
+  if (mode === "none") return new NullDisplay();
+  if (mode === "pixoo" || mode === "") return new HttpPixooDisplay();
+  throw new Error(`DESKHUB_DISPLAY must be "pixoo" or "none", received "${mode}"`);
+}
+
 export class HttpPixooDisplay implements PixooDisplay {
   private readonly baseUrl: string;
 

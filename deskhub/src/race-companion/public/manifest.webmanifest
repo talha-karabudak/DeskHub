@@ -1,0 +1,19 @@
+{
+  "id": "/race",
+  "name": "Race Companion",
+  "short_name": "Race",
+  "start_url": "/race",
+  "scope": "/race",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#090b0d",
+  "theme_color": "#090b0d",
+  "icons": [
+    {
+      "src": "/race/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -6,6 +6,7 @@ export interface IRacingTelemetry {
   position?: number;
   lap?: number;
   lapCompleted?: number;
+  lapsRemaining?: number;
   lapCurrentLapTime?: number;
   lapLastLapTime?: number;
   lapBestLapTime?: number;
@@ -45,4 +46,8 @@ export type IRacingDomainEvent =
 
 export interface IRacingTelemetrySource {
   snapshots(): AsyncIterable<IRacingTelemetry>;
+}
+
+export interface IRacingTelemetryObserver {
+  update(snapshot: IRacingTelemetry): void;
 }

@@ -2,7 +2,7 @@ import type { DeskHubCore } from "../../core/deskhub-core.ts";
 import { spotterFrame } from "./animations.ts";
 import { IRacingEventAdapter } from "./event-adapter.ts";
 import { IRacingEventDetector } from "./event-detector.ts";
-import type { IRacingTelemetrySource } from "./types.ts";
+import type { IRacingTelemetryObserver, IRacingTelemetrySource } from "./types.ts";
 
 export class IRacingPipeline {
   private position: number | undefined;
@@ -13,16 +13,19 @@ export class IRacingPipeline {
   private readonly core: DeskHubCore;
   private readonly detector: IRacingEventDetector;
   private readonly adapter: IRacingEventAdapter;
+  private readonly observers: readonly IRacingTelemetryObserver[];
   constructor(
     source: IRacingTelemetrySource,
     core: DeskHubCore,
     detector = new IRacingEventDetector(),
     adapter = new IRacingEventAdapter(),
+    observers: readonly IRacingTelemetryObserver[] = [],
   ) {
     this.source = source;
     this.core = core;
     this.detector = detector;
     this.adapter = adapter;
+    this.observers = observers;
   }
 
   getCurrentPosition(): number | undefined { return this.position; }
@@ -32,6 +35,7 @@ export class IRacingPipeline {
 
   async run(): Promise<void> {
     for await (const snapshot of this.source.snapshots()) {
+      for (const observer of this.observers) observer.update(snapshot);
       const wasConnected = this.position !== undefined;
       const events = this.detector.update(snapshot);
       const deskHubEvents = events.flatMap((event) => this.adapter.toDeskHub(event));
