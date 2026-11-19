@@ -28,6 +28,7 @@ export interface FaceitApiClientOptions {
   baseUrl?: string;
   fetch?: Fetch;
   sleep?: Sleep;
+  signal?: AbortSignal;
 }
 
 export class FaceitApiClient implements FaceitDataClient {
@@ -37,6 +38,7 @@ export class FaceitApiClient implements FaceitDataClient {
   private readonly baseUrl: string;
   private readonly fetchImpl: Fetch;
   private readonly sleep: Sleep;
+  private readonly signal: AbortSignal | undefined;
 
   constructor(options: FaceitApiClientOptions) {
     if (!options.apiKey) throw new Error("FACEIT_API_KEY is missing");
@@ -45,7 +47,8 @@ export class FaceitApiClient implements FaceitDataClient {
     this.maxAttempts = options.maxAttempts ?? 3;
     this.baseUrl = options.baseUrl ?? "https://open.faceit.com/data/v4";
     this.fetchImpl = options.fetch ?? fetch;
-    this.sleep = options.sleep ?? defaultSleep;
+    this.signal = options.signal;
+    this.sleep = options.sleep ?? ((milliseconds) => abortableWait(milliseconds, this.signal));
   }
 
   getPlayerByNickname(nickname: string): Promise<FaceitPlayer> {
@@ -72,9 +75,11 @@ export class FaceitApiClient implements FaceitDataClient {
     let lastError: unknown;
     for (let attempt = 1; attempt <= this.maxAttempts; attempt++) {
       try {
+        if (this.signal?.aborted) throw new FaceitApiError("FACEIT request aborted", undefined, false);
+        const timeout = AbortSignal.timeout(this.timeoutMs);
         const response = await this.fetchImpl(url, {
           headers: { Authorization: `Bearer ${this.apiKey}` },
-          signal: AbortSignal.timeout(this.timeoutMs),
+          signal: this.signal ? AbortSignal.any([this.signal, timeout]) : timeout,
         });
         if (response.ok) return await response.json() as T;
         const error = this.responseError(response);
@@ -121,4 +126,13 @@ export class FaceitApiClient implements FaceitDataClient {
     }
     return 500 * 2 ** (attempt - 1);
   }
+}
+
+function abortableWait(milliseconds: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return Promise.resolve();
+  return new Promise((resolve) => {
+    const finish = () => { clearTimeout(timer); signal?.removeEventListener("abort", finish); resolve(); };
+    const timer = setTimeout(finish, milliseconds);
+    signal?.addEventListener("abort", finish, { once: true });
+  });
 }

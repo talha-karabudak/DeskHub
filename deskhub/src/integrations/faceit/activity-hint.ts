@@ -10,7 +10,7 @@ export class WindowsProcessActivityHint implements FaceitActivityHint {
   async isActive(): Promise<boolean> {
     if (process.platform !== "win32") return false;
     try {
-      const { stdout } = await execFileAsync("tasklist.exe", ["/FO", "CSV", "/NH"], { windowsHide: true });
+      const { stdout } = await execFileAsync("tasklist.exe", ["/FO", "CSV", "/NH"], { windowsHide: true, timeout: 5_000 });
       const output = stdout.toLowerCase();
       return PROCESS_NAMES.some((name) => output.includes(`"${name}"`));
     } catch {

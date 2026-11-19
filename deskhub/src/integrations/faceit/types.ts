@@ -15,6 +15,8 @@ export interface FaceitPlacementState { played: number; wins: number; losses: nu
 
 export interface FaceitMatchSource {
   latestResult(): Promise<FaceitMatchResult | null>;
+  /** Commit a previously returned result only after the application delivers it. */
+  acknowledge?(matchId: string): Promise<void>;
 }
 
 export interface FaceitPlayer {
@@ -51,7 +53,7 @@ export interface FaceitDataClient {
   getMatch(matchId: string): Promise<FaceitHistoryItem>;
 }
 
-export interface FaceitPersistentState {
+export interface FaceitCommittedState {
   playerId: string;
   nickname: string;
   lastSeenMatchId: string;
@@ -61,6 +63,16 @@ export interface FaceitPersistentState {
   phase?: FaceitPhase;
   placement?: FaceitPlacementState | null;
   stateVersion?: number;
+}
+
+export interface FaceitPendingDelivery {
+  result: FaceitMatchResult;
+  committedState: FaceitCommittedState;
+}
+
+export interface FaceitPersistentState extends FaceitCommittedState {
+  /** One durable outbox item; the outer state remains the last acknowledged baseline. */
+  pendingDelivery?: FaceitPendingDelivery;
 }
 
 export interface FaceitStateStore {

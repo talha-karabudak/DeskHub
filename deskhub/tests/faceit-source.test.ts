@@ -54,7 +54,7 @@ test("new loss produces negative ELO delta", async () => {
 });
 test("duplicate and no-new-match polls do not emit again", async () => {
   const value = source(new FakeClient([1620, 1644, 1644], [match("old", true), match("new", true), match("new", true)]));
-  await value.latestResult(); assert.ok(await value.latestResult()); assert.equal(await value.latestResult(), null);
+  await value.latestResult(); assert.ok(await value.latestResult()); await value.acknowledge("new"); assert.equal(await value.latestResult(), null);
 });
 test("eventual-consistency retry waits for changed ELO", async () => {
   const client = new FakeClient([1620, 1620, 1620, 1644], [match("old", true), match("new", true)]); const value = source(client);
@@ -76,8 +76,11 @@ test("restart detects one new win and persists real delta", async () => {
   const store = new MemoryStore(stored(887, "A"));
   const client = new FakeClient([912], [match("B", true)]);
   client.histories = [{ items: [match("B", true), match("A", true)] }];
-  const result = await new RealFaceitSource({ client, nickname: "tester", stateStore: store, log: () => {} }).latestResult();
-  assert.equal(result?.eloDelta, 25); assert.equal(store.state?.lastSeenMatchId, "B"); assert.equal(store.state?.lastKnownElo, 912);
+  const value = new RealFaceitSource({ client, nickname: "tester", stateStore: store, log: () => {} });
+  const result = await value.latestResult();
+  assert.equal(result?.eloDelta, 25); assert.equal(store.state?.lastSeenMatchId, "A");
+  await value.acknowledge("B");
+  assert.equal(store.state?.lastSeenMatchId, "B"); assert.equal(store.state?.lastKnownElo, 912);
 });
 
 test("restart with same match emits nothing", async () => {
@@ -114,9 +117,11 @@ test("new match fetches player/ELO after history changes", async () => {
 test("placement start invalidates old ranked ELO and emits progress without delta", async () => {
   const store = new MemoryStore({ ...stored(1842, "A"), phase: "ranked", placement: null });
   const client = new FakeClient([1700], []); client.histories = [{ items: [match("B", true), match("A", false)] }];
-  const result = await new RealFaceitSource({ client, nickname: "tester", stateStore: store,
-    phaseProvider: new StaticPhase({ phase: "placement", placement: { played: 0, wins: 0, losses: 0, total: 10 } }), log: () => {} }).latestResult();
+  const value = new RealFaceitSource({ client, nickname: "tester", stateStore: store,
+    phaseProvider: new StaticPhase({ phase: "placement", placement: { played: 0, wins: 0, losses: 0, total: 10 } }), log: () => {} });
+  const result = await value.latestResult();
   assert.equal(result?.phase, "placement"); assert.equal(result?.eloDelta, null); assert.equal(result?.placement?.played, 1);
+  await value.acknowledge("B");
   assert.equal(store.state?.lastKnownElo, null); assert.equal(store.state?.phase, "placement");
 });
 
@@ -124,16 +129,20 @@ test("placement loss persists progress and restart keeps placement phase", async
   const store = new MemoryStore({ ...stored(null, "B"), phase: "placement",
     placement: { played: 1, wins: 1, losses: 0, total: 10 } });
   const client = new FakeClient([1700], []); client.histories = [{ items: [match("C", false), match("B", true)] }];
-  const result = await new RealFaceitSource({ client, nickname: "tester", stateStore: store,
-    phaseProvider: new StaticPhase({ phase: "placement", placement: { played: 0, wins: 0, losses: 0, total: 10 } }), log: () => {} }).latestResult();
+  const value = new RealFaceitSource({ client, nickname: "tester", stateStore: store,
+    phaseProvider: new StaticPhase({ phase: "placement", placement: { played: 0, wins: 0, losses: 0, total: 10 } }), log: () => {} });
+  const result = await value.latestResult();
+  await value.acknowledge("C");
   assert.equal(result?.won, false); assert.deepEqual(store.state?.placement, { played: 2, wins: 1, losses: 1, total: 10 });
 });
 
 test("placement completion establishes new ranked baseline without season-reset delta", async () => {
   const store = new MemoryStore({ ...stored(null, "C"), phase: "placement",
     placement: { played: 10, wins: 6, losses: 4, total: 10 } });
-  const result = await new RealFaceitSource({ client: new FakeClient([1734], [match("C", true)]), nickname: "tester", stateStore: store,
-    phaseProvider: new StaticPhase({ phase: "ranked" }), log: () => {} }).latestResult();
+  const value = new RealFaceitSource({ client: new FakeClient([1734], [match("C", true)]), nickname: "tester", stateStore: store,
+    phaseProvider: new StaticPhase({ phase: "ranked" }), log: () => {} });
+  const result = await value.latestResult();
   assert.equal(result?.placementCompleted, true); assert.equal(result?.eloDelta, null);
+  await value.acknowledge("placement-complete-C");
   assert.equal(store.state?.phase, "ranked"); assert.equal(store.state?.lastKnownElo, 1734);
 });

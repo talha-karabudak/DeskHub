@@ -5,6 +5,8 @@ import type { FaceitMatchResult } from "./types.ts";
 export class FaceitEventAdapter {
   private readonly processedMatches = new Set<string>();
 
+  release(matchId: string): void { this.processedMatches.delete(matchId); }
+
   toEvent(result: FaceitMatchResult): DeskHubEvent | undefined {
     return this.toEvents(result)?.[0];
   }
@@ -16,13 +18,16 @@ export class FaceitEventAdapter {
     }
     if (this.processedMatches.has(result.matchId)) return undefined;
     this.processedMatches.add(result.matchId);
-    if (result.placementCompleted) return [events.faceitPlaced(), events.faceitPlacedElo(result.eloAfter ?? result.eloBefore)];
+    const identify = (items: DeskHubEvent[]) => items.map((event, index) => ({
+      ...event, id: `faceit:${result.matchId}:${index}`, priority: items[0]!.priority,
+    }));
+    if (result.placementCompleted) return identify([events.faceitPlaced(), events.faceitPlacedElo(result.eloAfter ?? result.eloBefore)]);
     const resultEvent = result.won
       ? events.faceitMatchWon(result.eloDelta)
       : events.faceitMatchLost(result.eloDelta);
     if (result.phase === "placement" && result.placement) {
-      return [resultEvent, events.faceitPlacementProgress(result.placement.played, result.placement.total)];
+      return identify([resultEvent, events.faceitPlacementProgress(result.placement.played, result.placement.total)]);
     }
-    return result.eloDelta === null ? [resultEvent] : [resultEvent, events.faceitEloDelta(result.eloDelta)];
+    return identify(result.eloDelta === null ? [resultEvent] : [resultEvent, events.faceitEloDelta(result.eloDelta)]);
   }
 }

@@ -1,15 +1,21 @@
-import type { DeskHubCore } from "../../core/deskhub-core.ts";
+import type { DeskHubEvent } from "../../core/types.ts";
 import { FaceitEventAdapter } from "./faceit-event-adapter.ts";
 import type { FaceitMatchSource } from "./types.ts";
 
+export interface FaceitEventSink {
+  /** True means all event writes completed, not merely an in-memory enqueue. */
+  deliver(events: DeskHubEvent[]): Promise<boolean>;
+}
+
 export class FaceitIntegration {
   private readonly source: FaceitMatchSource;
-  private readonly core: DeskHubCore;
+  private readonly core: FaceitEventSink;
   private readonly adapter: FaceitEventAdapter;
+  private inFlight: Promise<boolean> | undefined;
 
   constructor(
     source: FaceitMatchSource,
-    core: DeskHubCore,
+    core: FaceitEventSink,
     adapter = new FaceitEventAdapter(),
   ) {
     this.source = source;
@@ -17,12 +23,26 @@ export class FaceitIntegration {
     this.adapter = adapter;
   }
 
-  async pollOnce(): Promise<boolean> {
+  pollOnce(): Promise<boolean> {
+    this.inFlight ??= this.deliverLatest().finally(() => { this.inFlight = undefined; });
+    return this.inFlight;
+  }
+
+  private async deliverLatest(): Promise<boolean> {
     const result = await this.source.latestResult();
     if (!result) return false;
     const events = this.adapter.toEvents(result);
     if (!events) return false;
-    this.core.enqueueMany(events);
-    return true;
+    try {
+      if (!await this.core.deliver(events)) {
+        this.adapter.release(result.matchId);
+        return false;
+      }
+      await this.source.acknowledge?.(result.matchId);
+      return true;
+    } catch (error) {
+      this.adapter.release(result.matchId);
+      throw error;
+    }
   }
 }

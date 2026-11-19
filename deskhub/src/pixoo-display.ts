@@ -39,9 +39,11 @@ export function createDisplay(mode = "pixoo"): PixooDisplay {
 
 export class HttpPixooDisplay implements PixooDisplay {
   private readonly baseUrl: string;
+  private readonly timeoutMs: number;
 
-  constructor(baseUrl = "http://127.0.0.1:8765") {
+  constructor(baseUrl = "http://127.0.0.1:8765", timeoutMs = 5_000) {
     this.baseUrl = baseUrl;
+    this.timeoutMs = timeoutMs;
   }
 
   async getStatus(): Promise<DisplayStatus> {
@@ -65,6 +67,7 @@ export class HttpPixooDisplay implements PixooDisplay {
       method: body ? "POST" : "GET",
       headers: body ? { "Content-Type": "application/json" } : undefined,
       body: body ? JSON.stringify(body) : undefined,
+      signal: AbortSignal.timeout(this.timeoutMs),
     });
     const payload = (await response.json()) as T & { error?: string };
     if (!response.ok) {

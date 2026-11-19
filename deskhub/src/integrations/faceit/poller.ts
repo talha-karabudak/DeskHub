@@ -1,6 +1,6 @@
-import type { DeskHubCore } from "../../core/deskhub-core.ts";
 import type { FaceitMatchSource } from "./types.ts";
 import { FaceitIntegration } from "./faceit-integration.ts";
+import type { FaceitEventSink } from "./faceit-integration.ts";
 import { FaceitApiError } from "./api-client.ts";
 import type { FaceitActivityHint } from "./activity-hint.ts";
 
@@ -9,13 +9,14 @@ export interface FaceitPollerOptions {
   idleIntervalMs: number;
   activityHint: FaceitActivityHint;
   log?: (message: string) => void;
+  onPoll?: () => void;
 }
 
 export class FaceitPoller {
   private readonly integration: FaceitIntegration;
   private readonly options: FaceitPollerOptions;
 
-  constructor(source: FaceitMatchSource, core: DeskHubCore, options: FaceitPollerOptions) {
+  constructor(source: FaceitMatchSource, core: FaceitEventSink, options: FaceitPollerOptions) {
     this.integration = new FaceitIntegration(source, core);
     this.options = options;
   }
@@ -24,6 +25,7 @@ export class FaceitPoller {
     while (!signal.aborted) {
       try {
         await this.integration.pollOnce();
+        this.options.onPoll?.();
       } catch (error) {
         if (error instanceof FaceitApiError && [401, 403, 404].includes(error.status ?? 0)) throw error;
         console.error("[FACEIT] Poll failed:", error instanceof Error ? error.message : error);
@@ -40,9 +42,11 @@ export class FaceitPoller {
   }
 
   private async waitForNextPoll(signal: AbortSignal, intervalMs: number): Promise<void> {
+    if (signal.aborted) return;
     await new Promise<void>((resolve) => {
-      const timer = setTimeout(resolve, intervalMs);
-      signal.addEventListener("abort", () => { clearTimeout(timer); resolve(); }, { once: true });
+      const finish = () => { clearTimeout(timer); signal.removeEventListener("abort", finish); resolve(); };
+      const timer = setTimeout(finish, intervalMs);
+      signal.addEventListener("abort", finish, { once: true });
     });
   }
 }

@@ -11,6 +11,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+from collections.abc import Callable
 
 from pixoo import Framebuffer, Pixoo
 from pixoo.discovery import find_serial_port
@@ -23,15 +24,30 @@ MAX_BODY_BYTES = 2 * 1024 * 1024
 class BridgeController:
     """Serializes display commands while owning one persistent Pixoo connection."""
 
-    def __init__(self, device: Pixoo, address: str, port: str) -> None:
+    def __init__(self, device: Pixoo, address: str, port: str,
+                 port_resolver: Callable[[], str] | None = None) -> None:
         self.device = device
         self.address = address
         self.port = port
         self._lock = threading.Lock()
+        self._port_resolver = port_resolver
 
     def connect(self) -> None:
         with self._lock:
+            if self._port_resolver is not None:
+                self.port = self._port_resolver()
+                self.device.transport.port = self.port
             self.device.reconnect()
+
+    def reconnect_if_needed(self) -> None:
+        with self._lock:
+            if self.device.transport.is_connected:
+                return
+            # Windows can assign a new COM after pairing; rediscover each attempt.
+            if self._port_resolver is not None:
+                self.port = self._port_resolver()
+                self.device.transport.port = self.port
+            self.device.connect()
 
     def close(self) -> None:
         with self._lock:
@@ -192,9 +208,25 @@ def load_controller(config_path: Path) -> BridgeController:
     config = json.loads(config_path.read_text(encoding="utf-8"))
     address = config["device_address"]
     configured_port = config.get("serial_port", "auto")
-    port = find_serial_port(address) if configured_port == "auto" else configured_port
+    # Device discovery must not prevent the HTTP service from starting.
+    port = configured_port
     device = Pixoo(SerialTransport(port, config.get("baudrate", 115200)))
-    return BridgeController(device, address, port)
+    resolver = (lambda: find_serial_port(address)) if configured_port == "auto" else None
+    return BridgeController(device, address, port, resolver)
+
+
+def reconnect_loop(controller: BridgeController, stopped: threading.Event) -> None:
+    last_error: str | None = None
+    while not stopped.is_set():
+        try:
+            controller.reconnect_if_needed()
+            last_error = None
+        except Exception as exc:
+            message = str(exc)
+            if message != last_error:
+                logger.warning("Pixoo unavailable; retrying in background: %s", message)
+                last_error = message
+        stopped.wait(3.0)
 
 
 def main() -> None:
@@ -207,14 +239,18 @@ def main() -> None:
         parser.error("bridge is local-only; host must be a loopback address")
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
     controller = load_controller(args.config)
-    controller.connect()
     server = BridgeHTTPServer((args.host, args.port), controller)
+    stopped = threading.Event()
+    reconnect_thread = threading.Thread(target=reconnect_loop, args=(controller, stopped), daemon=True)
+    reconnect_thread.start()
     logger.info("Pixoo bridge listening on http://%s:%d", args.host, args.port)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         logger.info("Stopping bridge")
     finally:
+        stopped.set()
+        reconnect_thread.join(timeout=1.0)
         server.server_close()
         controller.close()
 

@@ -66,3 +66,34 @@ test("custom normal view is restored after events", async () => {
   assert.deepEqual(display.calls, ["PB", "1234"]);
   assert.equal(core.state.pixoo.screen, "1234");
 });
+
+test("reliable delivery retries failed writes and deduplicates completed IDs", async () => {
+  const display = new FakeDisplay();
+  let fail = true;
+  const original = display.showText.bind(display);
+  display.showText = async (text, options) => {
+    if (text === "WIN" && fail) { fail = false; throw new Error("bridge unavailable"); }
+    await original(text, options);
+  };
+  const core = new DeskHubCore(display, async () => {});
+  const result = makeEvent("WIN", 70);
+  assert.equal(await core.deliver([result]), false);
+  assert.equal(await core.deliver([result]), true);
+  // A retry after a failed state commit must not play the result again.
+  assert.equal(await core.deliver([result]), true);
+  assert.equal(display.calls.filter((text) => text === "WIN").length, 1);
+});
+
+test("failed idle restoration does not replay an already delivered result", async () => {
+  const display = new FakeDisplay();
+  const original = display.showText.bind(display);
+  display.showText = async (text, options) => {
+    if (text === "RDY") throw new Error("idle write failed");
+    await original(text, options);
+  };
+  const core = new DeskHubCore(display, async () => {});
+  const result = makeEvent("WIN", 70);
+  assert.equal(await core.deliver([result]), true);
+  assert.equal(await core.deliver([result]), true);
+  assert.deepEqual(display.calls, ["WIN"]);
+});

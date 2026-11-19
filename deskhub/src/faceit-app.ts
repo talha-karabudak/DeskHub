@@ -26,7 +26,6 @@ async function main(): Promise<void> {
   const statePath = fileURLToPath(new URL("../../data/faceit-state.json", import.meta.url));
   const source = new RealFaceitSource({ client, nickname: config.nickname, stateStore: new JsonFaceitStateStore(statePath),
     phaseProvider: new ConfiguredFaceitPhaseProvider(config.phaseMode, config.placementPlayed, config.placementTotal) });
-  await source.latestResult();
   const core = new DeskHubCore(display, undefined, () => source.getCurrentPhase() === "placement"
     ? faceitPlacementIdleView(source.getPlacement()) : faceitIdleView(source.getCurrentLevel()));
   await core.showNormal();

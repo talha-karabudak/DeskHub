@@ -130,3 +130,62 @@ async function poll() {
 }
 
 poll();
+
+async function setupPixooSettings() {
+  const endpoint = "/api/pixoo/settings";
+  const panel = document.getElementById("pixoo-settings");
+  const options = document.getElementById("pixoo-options");
+  const status = document.getElementById("pixoo-status");
+  const ipad = document.getElementById("pixoo-ipad");
+  const full = document.getElementById("pixoo-full");
+  const labels = {
+    position: "Position", lap: "Lap time and delta", pb: "Personal best",
+    incident: "Incidents", yellow: "Yellow flag", blue: "Blue flag",
+    spotter: "Left/right spotter", start: "Start lights", pit: "Pit entry",
+    lastLap: "Last lap", finish: "Finish", fuel: "Fuel shortfall",
+  };
+  const ipadItems = new Set(["pb", "lastLap", "finish", "fuel"]);
+  const response = await fetch(endpoint, { cache: "no-store" });
+  if (!response.ok) return;
+  let saved = await response.json();
+  const inputs = Object.entries(labels).map(([name, title]) => {
+    const label = document.createElement("label");
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = saved[name];
+    input.addEventListener("change", () => save({ ...saved, [name]: input.checked }));
+    label.append(input, title);
+    options.append(label);
+    return [name, input];
+  });
+
+  async function save(settings) {
+    options.disabled = ipad.disabled = full.disabled = true;
+    status.textContent = "Saving…";
+    try {
+      const result = await fetch(endpoint, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+      });
+      if (!result.ok) throw new Error(`HTTP ${result.status}`);
+      saved = await result.json();
+      status.textContent = "Saved";
+    } catch {
+      status.textContent = "Could not save Pixoo settings";
+    } finally {
+      for (const [name, input] of inputs) input.checked = saved[name];
+      options.disabled = ipad.disabled = full.disabled = false;
+    }
+  }
+
+  ipad.addEventListener("click", () => save(Object.fromEntries(
+    Object.keys(labels).map((name) => [name, ipadItems.has(name)]),
+  )));
+  full.addEventListener("click", () => save(Object.fromEntries(
+    Object.keys(labels).map((name) => [name, name !== "fuel"]),
+  )));
+  panel.hidden = false;
+}
+
+setupPixooSettings().catch((error) => console.warn("Pixoo settings unavailable", error));

@@ -186,3 +186,34 @@ Known limitations:
 - Low fuel, güvenilir fuel-laps-remaining modeli kurulana kadar ertelendi.
 - Pit-cycle/session reset kaynaklı büyük position sıçramaları bastırılır.
 - Queue preemption bu milestone'un parçası değildir.
+
+## Unified DeskHub
+
+Normal kullanımda FACEIT ve iRacing için ayrı uygulamalar çalıştırılmaz. Tek
+uygulama tek event queue ve tek Pixoo sahibi kullanır. Mod önceliği:
+
+```text
+IRACING > FACEIT > NORMAL
+```
+
+Önce repository kökünde Python bridge'i başlatın:
+
+```powershell
+.\.venv\Scripts\python.exe bridge.py
+```
+
+İkinci terminalde unified uygulamayı başlatın:
+
+```powershell
+cd .\deskhub
+npm.cmd run deskhub
+```
+
+`IRACING_ENABLED=true` olduğunda yalnızca bağlı ve aktif track telemetry'si
+iRacing modunu açar. FACEIT/CS2 process kontrolü yalnızca activity hint'tir;
+maç sonucu için FACEIT API kaynak olmaya devam eder. Yarış sırasında bulunan
+FACEIT sonucu persistent pending state'te kalır, yarış bittiğinde bir kez
+gösterilir ve ancak başarılı display teslimatından sonra acknowledged olur.
+
+Eski `faceit`, `iracing`, `iracing:check` ve `iracing:inspect` komutları debug
+amaçlı korunur; unified uygulamayla aynı anda çalıştırılmamalıdır.

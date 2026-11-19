@@ -1,7 +1,34 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { loadPixooSettings, savePixooSettings } from "../src/integrations/iracing/pixoo-settings.ts";
 import { RaceStateProjector } from "../src/integrations/iracing/race-state-projector.ts";
 import { RaceCompanionServer } from "../src/race-companion/server.ts";
+
+test("Pixoo settings API validates changes and persists them across reads", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "deskhub-pixoo-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const path = join(directory, "data", "settings.json");
+  const projector = new RaceStateProjector();
+  const server = new RaceCompanionServer(() => projector.getState(), {
+    port: 0, pixooSettings: { get: () => loadPixooSettings(path), save: (settings) => savePixooSettings(path, settings) },
+  });
+  const { port } = await server.start();
+  context.after(() => server.close());
+  const url = `http://127.0.0.1:${port}/api/pixoo/settings`;
+  const put = (body: unknown) => fetch(url, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+  const initial = await (await fetch(url)).json();
+  assert.equal(initial.spotter, true);
+  assert.equal((await put({ ...initial, spotter: false, fuel: true })).status, 200);
+  assert.equal((await put({ spotter: "false" })).status, 400);
+  assert.deepEqual(loadPixooSettings(path), { ...initial, spotter: false, fuel: true });
+  assert.equal((await put({ ...initial, pit: false })).status, 200);
+  assert.equal(loadPixooSettings(path).pit, false);
+});
 
 test("health and race state are JSON, no-store, and unknown routes are 404", async (context) => {
   const projector = new RaceStateProjector();

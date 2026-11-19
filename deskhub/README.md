@@ -4,6 +4,28 @@ The TypeScript layer owns application state, modes, business events, and the
 priority queue. It talks to the local Python Pixoo adapter over HTTP; it never
 imports Bluetooth or protocol code.
 
+## Unified DeskHub
+
+The combined Pixoo + iPad launcher is `scripts/start-deskhub.cmd` (from the
+repository root). Pixoo is optional and may be switched on later. See
+`docs/unified-runtime.md` for pairing, private configuration, and reconnect details.
+
+Start the bridge from the repository root, then run the single application:
+
+```powershell
+.\.venv\Scripts\python.exe bridge.py
+cd .\deskhub
+npm.cmd run deskhub
+```
+
+One mode manager owns the queue and physical display. Mode priority is
+`IRACING > FACEIT > NORMAL`; active iRacing means connected, usable on-track
+telemetry, not merely a running process. FACEIT results discovered during a
+race remain pending and are displayed once after the session ends. Set
+`IRACING_ENABLED=true` to enable the native telemetry source. The separate
+`faceit`, `iracing`, `iracing:check`, and `iracing:inspect` commands remain for
+debugging and should not run beside the unified app.
+
 ```powershell
 # Python bridge, from the repository root
 .\.venv\Scripts\python.exe bridge.py

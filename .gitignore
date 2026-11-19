@@ -6,3 +6,8 @@ node_modules/
 .env
 data/faceit-state.json
 data/faceit-state.json.tmp
+data/bridge.log
+data/bridge-error.log
+data/pixoo-settings.json
+data/pixoo-settings.json.tmp
+test-temp/

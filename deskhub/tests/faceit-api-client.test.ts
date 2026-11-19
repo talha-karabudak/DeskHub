@@ -35,6 +35,24 @@ test("authentication errors are never retried", async () => {
   assert.equal(calls, 1);
 });
 
+test("shutdown aborts a FACEIT request without retrying", async () => {
+  const controller = new AbortController();
+  let calls = 0;
+  const client = new FaceitApiClient({
+    apiKey: "secret", signal: controller.signal,
+    fetch: async (_input, init) => {
+      calls++;
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+      });
+    },
+  });
+  const pending = client.getPlayerByNickname("tester");
+  controller.abort();
+  await assert.rejects(pending, /request aborted|network request failed/);
+  assert.equal(calls, 1);
+});
+
 test("configuration fails clearly when credentials are absent", () => {
   assert.throws(() => loadFaceitConfig({}), /FACEIT_API_KEY is missing/);
   assert.throws(() => loadFaceitConfig({ FACEIT_API_KEY: "x" }), /FACEIT_NICKNAME is missing/);

@@ -1,8 +1,16 @@
-import type { DeskHubCore } from "../../core/deskhub-core.ts";
+import type { DeskHubEvent, PixooView } from "../../core/types.ts";
 import { spotterFrame } from "./animations.ts";
 import { IRacingEventAdapter } from "./event-adapter.ts";
 import { IRacingEventDetector } from "./event-detector.ts";
-import type { IRacingTelemetryObserver, IRacingTelemetrySource } from "./types.ts";
+import type { IRacingTelemetry, IRacingTelemetryObserver, IRacingTelemetrySource } from "./types.ts";
+
+export interface IRacingEventSink {
+  enqueueMany(events: DeskHubEvent[]): void;
+  requestNormal(): void;
+  setUrgentOverlay(view: PixooView | undefined): Promise<void>;
+  whenIdle(): Promise<void>;
+  onIRacingTelemetry?(snapshot: IRacingTelemetry): void | Promise<void>;
+}
 
 export class IRacingPipeline {
   private position: number | undefined;
@@ -10,13 +18,13 @@ export class IRacingPipeline {
   private yellowFlag = false;
   private blueFlag = false;
   private readonly source: IRacingTelemetrySource;
-  private readonly core: DeskHubCore;
+  private readonly core: IRacingEventSink;
   private readonly detector: IRacingEventDetector;
   private readonly adapter: IRacingEventAdapter;
   private readonly observers: readonly IRacingTelemetryObserver[];
   constructor(
     source: IRacingTelemetrySource,
-    core: DeskHubCore,
+    core: IRacingEventSink,
     detector = new IRacingEventDetector(),
     adapter = new IRacingEventAdapter(),
     observers: readonly IRacingTelemetryObserver[] = [],
@@ -36,6 +44,7 @@ export class IRacingPipeline {
   async run(): Promise<void> {
     for await (const snapshot of this.source.snapshots()) {
       for (const observer of this.observers) observer.update(snapshot);
+      await this.core.onIRacingTelemetry?.(snapshot);
       const wasConnected = this.position !== undefined;
       const events = this.detector.update(snapshot);
       const deskHubEvents = events.flatMap((event) => this.adapter.toDeskHub(event));

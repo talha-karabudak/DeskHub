@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "deskhub": "node --experimental-strip-types src/deskhub-app.ts",
     "milestone2": "node --experimental-strip-types src/milestone2.ts",
     "milestone3": "node --experimental-strip-types src/milestone3.ts",
     "milestone4": "node --experimental-strip-types src/milestone4.ts",
